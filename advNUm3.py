@@ -25,11 +25,11 @@ job = pd.read_pickle(open("eng_jobs.p","rb"))
 job.shape
 
 
-# ## Text preprocessing 
-# 1- we prepare, clean and tokenize the text 
+# ## Text preprocessing
+# 1- we prepare, clean and tokenize the text
 # 2 - we calculate the tf_idf of each word for each job considering the whole corpus
-# 
-# ... take some time 
+#
+# ... take some time
 
 # In[4]:
 
@@ -37,15 +37,15 @@ job.shape
 #https://www.quora.com/How-can-I-tokenize-a-string-without-using-built-in-function
 
 def text_preprocessing(para):
-    
+
     #strip the text into sentences
     #nlp=sent_tokenize(para)
     #split the sentences into words: tokenization
     #nlp=[word_tokenize(sent) for sent in nlp]
-    
+
     WORD = re.compile(r'\w+')
     nlp = WORD.findall(para)
-    # remove non alphanumeric character , inculding punctuation 
+    # remove non alphanumeric character , inculding punctuation
     nlp=[re.sub('[^A-Za-z]', '', word) for word in nlp]
     # remove stop words ; get each work in lowercase ; stem each word
     stop_words=set(stopwords.words("english"))
@@ -63,11 +63,11 @@ corpus = list(job["text_process"])
 
 
 # ## text to vec using tf_idf
-# 
+#
 # - we already vectorized each job ad but they don't share the same vocabulary
 # - we have to be able to compare job ads to each other , so we need a global "dictionnary" for all words in the job ads
-# - But there are a lot of words so a lot of features 
-# - But we are only interested in useful words (neither too common , but frequent enough to bring information that can be used- 
+# - But there are a lot of words so a lot of features
+# - But we are only interested in useful words (neither too common , but frequent enough to bring information that can be used-
 # - to do this we are to study frequency and existence of each words and select a threshold
 
 # In[7]:
@@ -99,7 +99,7 @@ def idf(word, txt_corpus):
 corpus_word = []
 for wordlist in enumerate(corpus):
     corpus_word +=  wordlist[1]
-    
+
 corpus_word2 = list(set(corpus_word))
 
 
@@ -127,7 +127,7 @@ df_vocab.TF = df_vocab.TF/sum(df_vocab.TF)
 
 minIDF = len(corpus)*(1/100)  # at least in 1% of the documents
 maxIDF = len(corpus)*(90/100)  # maximum in 90% of the documents
-minTF = 100 / len(corpus_word) # at least 100 occurencies of the words
+minTF = 100 / len(corpus_word) # at least 100 occurences of the words
 df_vocab_useful = df_vocab.loc[(df_vocab.TF > minTF) & (df_vocab.IDF < math.log(len(corpus) / (1 + minIDF)) )& (df_vocab.IDF > math.log(len(corpus) / (1 + maxIDF)) ),]
 df_vocab_useful = df_vocab_useful.set_index('Word')
 
@@ -250,7 +250,7 @@ k_fin
 # In[121]:
 
 
-skills = k_data + k_sales + k_sp + k_fin 
+skills = k_data + k_sales + k_sp + k_fin
 
 
 # In[122]:
@@ -276,7 +276,7 @@ job_training_data = job.copy()
 # In[125]:
 
 
-for skill in skills: 
+for skill in skills:
     job_training_data[skill] = 0
     job_training_data[skill] = job_training_data.text_process.map(lambda text_process : 1 if skill in text_process else 0  )
 
@@ -378,4 +378,3 @@ def pred_accu_skill (y):
 for i in range(7, 27):
     y = job_training_data.iloc[:,i]
     print(pred_accu_skill(y))
-
