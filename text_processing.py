@@ -10,9 +10,6 @@ import math
 import heapq
 
 
-ENCODING = 'ISO 8859-1'
-NB_KEYWORDS = 5
-
 # ## Text preprocessing
 # 1- we prepare, clean and tokenize the text
 # 2 - we calculate the tf_idf of each word for each job considering the whole corpus
@@ -21,9 +18,9 @@ NB_KEYWORDS = 5
 
 #https://www.quora.com/How-can-I-tokenize-a-string-without-using-built-in-function
 
-def text_preprocessing(para):
+def tokenization(text):
     WORD = re.compile(r'\w+')
-    nlp = WORD.findall(para)
+    nlp = WORD.findall(text)
 
     # remove non alphanumeric character inculding punctuation
     nlp = [re.sub('[^A-Za-z]', '', word) for word in nlp]
@@ -34,9 +31,11 @@ def text_preprocessing(para):
     porter_stemmer = PorterStemmer()
     preprocessed = [porter_stemmer.stem(word.lower()) for word in nlp]
     preprocessed = [word for word in preprocessed if not word in stop_words]
-    print(preprocessed)
     return preprocessed
 
+    # preprocessed_Series = pd.Series(preprocessed)
+    # if df_vocab_useful:
+    #     preprocessed_Series = preprocessed_Series.map(lambda txt_tokenized :[tf(word, txt_tokenized) * df_vocab_useful.loc[word, "IDF"] for word in corpus_word_list])
 
 # ## text to vec using tf_idf
 #
@@ -59,7 +58,6 @@ def idf(word, txt_corpus):
 
 
 # ## Get keywords
-
 def get_keywords(tfidf_vector_list, nb_keyword, df_vocab_useful):
     C = list(tfidf_vector_list)
     t = [np.mean(x) for x in zip(*C)]
@@ -67,65 +65,56 @@ def get_keywords(tfidf_vector_list, nb_keyword, df_vocab_useful):
     keywords = list(df_vocab_useful.iloc[b,].index)
     return keywords
 
-# Opens and read the json data file
-with open("trainingDataScrapped.json","r", encoding=ENCODING) as file:
-    contents = file.read()
+def define_corpus(ads):
+    ads["text_process"] = ads['description'].map(tokenization)
+    corpus = list(ads["text_process"])
 
-ads = pd.read_json(contents)
+    # Take only unique words
+    corpus_word = []
+    for wordlist in enumerate(corpus):
+        corpus_word +=  wordlist[1]
 
-# For test cases, take only a part of the set -- TODO Remove in production
-small_set = pd.DataFrame()
-for searchTerm in ads.searchTerm.unique():
-    small_set = small_set.append(ads.loc[ads.searchTerm == searchTerm].head(100))
-ads = small_set
+    corpus_word2 = list(set(corpus_word))
 
-# Preprocess the text
-ads["text_process"] = ads['description'].head(5).map(text_preprocessing)
-corpus = list(ads["text_process"])
+    # TF IDF
+    TF = Counter(corpus_word)
+    # Why does IDF give the same negative number to all words?
+    IDF = {word : idf(word, corpus) for word in corpus_word2}
 
-# Take only unique words
-corpus_word = []
-for wordlist in enumerate(corpus):
-    corpus_word +=  wordlist[1]
+    # Transform previous TF and IDF in DataFrames
+    Term_Freq = pd.DataFrame( {"Word" : list(TF.keys()), "TF" :list(TF.values())} )
+    Term_IDF = pd.DataFrame( {"Word" : list(IDF.keys()), "IDF" :list(IDF.values())} )
 
-corpus_word2 = list(set(corpus_word)) # Set takes only unique words
+    # Merge both based on word
+    df_vocab = Term_Freq.merge(Term_IDF, on="Word")
+    df_vocab.TF = df_vocab.TF / sum(df_vocab.TF)
 
-# TF IDF
-TF = Counter(corpus_word)
-# Why does IDF give the same negative number to all words?
-IDF = {word : idf(word, corpus) for word in corpus_word2}
+    # Set filters
+    minIDF = len(corpus) * (1 / 100)  # at least in 1% of the documents
+    maxIDF = len(corpus) * (90 / 100)  # maximum in 90% of the documents
+    minTF = 100 / len(corpus_word) # at least 100 occurences of the words
 
-# Transform previous TF and IDF in DataFrames
-Term_Freq = pd.DataFrame( {"Word" : list(TF.keys()), "TF" :list(TF.values())} )
-Term_IDF = pd.DataFrame( {"Word" : list(IDF.keys()), "IDF" :list(IDF.values())} )
+    # Implement the filters
+    df_vocab_useful = df_vocab.loc[(df_vocab.TF > minTF) & (df_vocab.IDF < math.log(len(corpus) / (1 + minIDF)) )& (df_vocab.IDF > math.log(len(corpus) / (1 + maxIDF)) ),]
+    df_vocab_useful = df_vocab_useful.set_index('Word')
 
-# Merge both based on word
-df_vocab = Term_Freq.merge(Term_IDF, on="Word")
-df_vocab.TF = df_vocab.TF / sum(df_vocab.TF)
+    corpus_word_list = list(df_vocab_useful.index)
 
-# How precise is it?
+    return df_vocab_useful, corpus_word_list
+    ## END DEFINE CORPUS
 
-# Set filters
-minIDF = len(corpus) * (1 / 100)  # at least in 1% of the documents
-maxIDF = len(corpus) * (90 / 100)  # maximum in 90% of the documents
-minTF = 100 / len(corpus_word) # at least 100 occurences of the words
+def vectorization(ads, df_vocab_useful, corpus_word_list):
+    ads["tfidf_voc"]  = ads.text_process.map(lambda txt_tokenized :[tf(word, txt_tokenized) * df_vocab_useful.loc[word, "IDF"] for word in corpus_word_list])
 
-# Implement the filters
-df_vocab_useful = df_vocab.loc[(df_vocab.TF > minTF) & (df_vocab.IDF < math.log(len(corpus) / (1 + minIDF)) )& (df_vocab.IDF > math.log(len(corpus) / (1 + maxIDF)) ),]
-df_vocab_useful = df_vocab_useful.set_index('Word')
-# SAVE HERE ~ 500 words for 4000 job ads
+def get_skills_list(ads, nb_keywords, df_vocab_useful):
+    domain_skills = []
+    for searchTerm in ads.searchTerm.unique():
+        # Use 100 ads in domain searchTerm
+        tfidf_vector_list = ads.loc[ads.searchTerm == searchTerm, "tfidf_voc"].iloc[:100,]
+        domain_skills += get_keywords(tfidf_vector_list, nb_keywords, df_vocab_useful)
 
-df_vocab_useful["initial_value"] =  0
-vocab = df_vocab_useful.loc[: ,("initial_value")].to_dict()
+    return set(domain_skills)
 
-corpus_word_list = list(df_vocab_useful.index)
-
-# Creates new column and affects the TF_IDF values
-ads["tfidf_voc"]  = ads.text_process.map(lambda txt_tokenized :[tf(word, txt_tokenized) * df_vocab_useful.loc[word, "IDF"] for word in corpus_word_list])
-
-keywords_set = []
-for searchTerm in ads.searchTerm.unique():
-    tfidf_vector_list = ads.loc[ads.searchTerm == searchTerm, "tfidf_voc"]
-    keywords_set += get_keywords(tfidf_vector_list, NB_KEYWORDS, df_vocab_useful)
-
-print(set(keywords_set))
+def specify_skill(ads, skills_list):
+    for skill in skills_list:
+        ads[skill] = ads.text_process.map(lambda text_process : 1 if skill in text_process else 0)

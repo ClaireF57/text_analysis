@@ -129,7 +129,7 @@ filename = "model_dict.p"
 pickle.dump(model_dict, open(filename, 'wb'))
 
 
-# upload the models 
+# upload the models
 ## to try the test
 
 filename = "model_dict.p"
