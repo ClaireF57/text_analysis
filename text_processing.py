@@ -30,9 +30,11 @@ def text_preprocessing(para):
 
     # remove stop words ; get each word in lowercase ; stem each word
     stop_words = set(stopwords.words('english'))
-    stop_words = list(stop_words) + ['','The' , 'we', 'you'] # add other words to remove
+    stop_words = list(stop_words) + [''] # add other words to remove
     porter_stemmer = PorterStemmer()
-    preprocessed = [porter_stemmer.stem(word.lower()) for word in nlp if not word in stop_words]
+    preprocessed = [porter_stemmer.stem(word.lower()) for word in nlp]
+    preprocessed = [word for word in preprocessed if not word in stop_words]
+    print(preprocessed)
     return preprocessed
 
 
@@ -74,11 +76,11 @@ ads = pd.read_json(contents)
 # For test cases, take only a part of the set -- TODO Remove in production
 small_set = pd.DataFrame()
 for searchTerm in ads.searchTerm.unique():
-    small_set = small_set.append(ads.loc[ads.searchTerm == searchTerm].head(10))
+    small_set = small_set.append(ads.loc[ads.searchTerm == searchTerm].head(100))
 ads = small_set
 
 # Preprocess the text
-ads["text_process"] = ads['description'].map(text_preprocessing)
+ads["text_process"] = ads['description'].head(5).map(text_preprocessing)
 corpus = list(ads["text_process"])
 
 # Take only unique words
@@ -89,7 +91,6 @@ for wordlist in enumerate(corpus):
 corpus_word2 = list(set(corpus_word)) # Set takes only unique words
 
 # TF IDF
-# TF OK
 TF = Counter(corpus_word)
 # Why does IDF give the same negative number to all words?
 IDF = {word : idf(word, corpus) for word in corpus_word2}
@@ -112,7 +113,7 @@ minTF = 100 / len(corpus_word) # at least 100 occurences of the words
 # Implement the filters
 df_vocab_useful = df_vocab.loc[(df_vocab.TF > minTF) & (df_vocab.IDF < math.log(len(corpus) / (1 + minIDF)) )& (df_vocab.IDF > math.log(len(corpus) / (1 + maxIDF)) ),]
 df_vocab_useful = df_vocab_useful.set_index('Word')
-
+# SAVE HERE ~ 500 words for 4000 job ads
 
 df_vocab_useful["initial_value"] =  0
 vocab = df_vocab_useful.loc[: ,("initial_value")].to_dict()
@@ -127,4 +128,4 @@ for searchTerm in ads.searchTerm.unique():
     tfidf_vector_list = ads.loc[ads.searchTerm == searchTerm, "tfidf_voc"]
     keywords_set += get_keywords(tfidf_vector_list, NB_KEYWORDS, df_vocab_useful)
 
-print(keywords_set)
+print(set(keywords_set))
