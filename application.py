@@ -18,10 +18,10 @@ ads_set = pd.read_json(contents)
 
 result = []
 random.seed()
-bounds = random.randrange(len(ads_set))
-for i in range(bounds, bounds + 20):
-    ads = ads_set[i:i + 1]
-    trained_model = pickle.load(open("trained_model.p", 'rb'))
+for i in range(0, 20):
+    bounds = random.randrange(len(ads_set))
+    ads = ads_set[bounds:bounds + 1]
+    trained_model = pickle.load(open("trained_model1.p", 'rb'))
 
     ads["text_process"] = ads['description'].map(tokenization)
 
