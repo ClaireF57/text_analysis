@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import json
+import pickle
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import SGDClassifier,LogisticRegression
@@ -24,7 +25,7 @@ ads = pd.read_json(contents)
 ## For test cases, take only a part of the set -- TODO Remove in production
 small_set = pd.DataFrame()
 for searchTerm in ads.searchTerm.unique():
-    small_set = small_set.append(ads.loc[ads.searchTerm == searchTerm].head(10))
+    small_set = small_set.append(ads.loc[ads.searchTerm == searchTerm].head(100))
 ads = small_set
 
 ##
@@ -80,8 +81,8 @@ for i in range(FIRST_SKILL_COLUMN_NB, LAST_SKILL_COLUMN_NB):
     print(get_metrics(best_model, X_test, y_test))
 
 # Dump the results in a file
-with open('trained_model.json', 'w') as outfile:
-    json.dump({'model_dict': model_dict,
+with open('trained_model.p', 'wb') as outfile:
+    pickle.dump({'model_dict': model_dict,
                'corpus_word_list': corpus_word_list,
                'df_vocab_useful': df_vocab_useful
                }, outfile)
