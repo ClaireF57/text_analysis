@@ -19,7 +19,7 @@ ads_set = pd.read_json(contents)
 result = []
 random.seed()
 # DRAWS RANDOMLY 20 JOB ADS FROM THE LIST
-for i in range(0, 20):
+for i in range(0, 100):
     bounds = random.randrange(len(ads_set))
     ads = ads_set[bounds:bounds + 1]
     trained_model = pickle.load(open("trained_model.p", 'rb'))
